@@ -79,6 +79,18 @@ void MotionTrackingApp::TangoSetupConfig() {
         ret);
     std::exit(EXIT_SUCCESS);
   }
+
+    //enable_learning_mode to test if relocalization works or not in learning mode
+
+    ret = TangoConfig_setBool(tango_config_, "config_enable_learning_mode", true);
+    if (ret != TANGO_SUCCESS) {
+        LOGE(
+                "MotionTrackingApp: config_enable_learning_mode() failed with error"
+                        "code: %d",
+                ret);
+        std::exit(EXIT_SUCCESS);
+    }
+
 }
 
 // Connect to Tango Service, service will start running, and
@@ -127,16 +139,24 @@ void MotionTrackingApp::OnDrawFrame() {
 
   TangoPoseData pose;
 
-  TangoSupport_getPoseAtTime(
-      0.0, TANGO_COORDINATE_FRAME_START_OF_SERVICE,
-      TANGO_COORDINATE_FRAME_DEVICE, TANGO_SUPPORT_ENGINE_OPENGL,
-      TANGO_SUPPORT_ENGINE_OPENGL,
-      static_cast<TangoSupportRotation>(screen_rotation_), &pose);
 
-  if (pose.status_code != TANGO_POSE_VALID) {
-    LOGE("MotionTrackingApp: Tango pose is not valid.");
-    return;
-  }
+    //I have an issue here:
+    // once motion tracking is lost (e.g. obscure the fisheye camera for a while)
+    // this function can never return valid pose if the
+    // base frame is TANGO_COORDINATE_FRAME_AREA_DESCRIPTION.
+    // It happens for both auto_recovery or  manual recovery.
+
+
+    TangoSupport_getPoseAtTime(
+            0.0, TANGO_COORDINATE_FRAME_AREA_DESCRIPTION,
+            TANGO_COORDINATE_FRAME_DEVICE, TANGO_SUPPORT_ENGINE_OPENGL,
+            TANGO_SUPPORT_ENGINE_OPENGL,
+            static_cast<TangoSupportRotation>(screen_rotation_), &pose);
+
+    if (pose.status_code != TANGO_POSE_VALID) {
+        LOGE("MotionTrackingApp: Tango pose is not valid.");
+        return;
+    }
 
   // Rotate the logo cube related with the delta time
   main_scene_.RotateCubeByPose(pose);
